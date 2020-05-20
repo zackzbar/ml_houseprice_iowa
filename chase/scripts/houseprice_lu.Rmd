@@ -1,0 +1,29 @@
+---
+title: "houseprice_lu"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## R Markdown
+ <http://rmarkdown.rstudio.com>.
+```{r}
+setwd("~/Dropbox/nycdsa/projects/proj3_houseprice")
+library(tidyverse)
+library(VIM)
+library(mice)
+```
+
+```{r}
+train = read_csv("data/train.csv")
+test = read_csv("data/test.csv")
+```
+```{r}
+dim(train)
+complete.cases(train) %>% sum()
+is.na(train)
+VIM::aggr(train)
+```
+
+
