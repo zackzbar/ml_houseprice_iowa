@@ -8,22 +8,99 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 ## R Markdown
  <http://rmarkdown.rstudio.com>.
-```{r}
-setwd("~/Dropbox/nycdsa/projects/proj3_houseprice")
-library(tidyverse)
-library(VIM)
-library(mice)
+```{r set.up.env.package}
+setwd("~/Dropbox/nycdsa/projects/proj3_houseprice/lu")
+# library for data wrangling & plotting
+library(tidyverse);library(zeallot)
+# library for data imputing
+library(VIM);library(mice);library(caret);library(Hmisc)
+# library for modeling
 ```
 
-```{r}
-train = read_csv("data/train.csv")
-test = read_csv("data/test.csv")
-```
-```{r}
-dim(train)
-complete.cases(train) %>% sum()
-is.na(train)
-VIM::aggr(train)
+```{r load.data.set}
+train = read_csv("./raw_data/train.csv")
+test = read_csv("./raw_data/test.csv")
 ```
 
+```{r check.NA}
+# check what NA stands for and how to impute
+train[!is.na(train$LotFrontage), c("LotFrontage", "LotArea", "Street")] %>% .[order(.$LotFrontage),] %>% View() 
+train[is.na(train$LotFrontage), c("LotFrontage", "LotArea", "Street")] %>% .[order(.$LotFrontage),] %>% View() #So LotFrontage NA is due to LotArea 0, impute with 0
+train[is.na(train$LotFrontage), ] %>% nrow()
 
+train[is.na(train$Alley), "Alley" ] %>% View()
+
+train[is.na(train$Exterior2nd), c("Exterior1st", "Exterior2nd")] %>% View()
+
+train[is.na(train$MasVnrType), c('MasVnrType', 'MasVnrArea')] %>% View() # so MasVnrType NA & MasVnrArea NA are due to no masonry veneer, impute with "nothing" 
+
+train[!is.na(train$Electrical), c("Electrical", "Utilities", "CentralAir", "HeatingQC", "Heating")] %>% View()
+
+train[is.na(train$BsmtExposure) | is.na(train$BsmtFinType2),c("Id", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2","BsmtUnfSF","TotalBsmtSF")] %>% View() # id 949, BsmtExposure should be no, because it has all other basement features, NA here should not mean no basement, impute with "No", rest NA rows impute with Nothing; id 333, BsmtFinType2 is null, but has all other basement features, so here NA means no 2nd finish, but can still impute with Nothing
+
+train[is.na(train$PoolQC), c("PoolArea", "PoolQC")] %>% View()
+
+train[is.na(train$FireplaceQu), c("FireplaceQu", "Fireplaces")] %>% View()
+
+train[is.na(train$Fence), "Fence"] %>% View()
+
+train[is.na(train$MiscFeature), c("MiscFeature", "MiscVal")] %>% View()
+```
+```{r trim}
+
+train = apply(train, 2, function(x) tolower(x))
+train = apply(train, 2, function(x) trimws(x))
+train = as.data.frame(train)
+
+```
+```{r impute.NA}
+train$LotFrontage = impute(train$LotFrontage, 0)
+train$Alley = impute(train$Alley, "nothing")
+
+train$MasVnrType = impute(train$MasVnrType, "nothing")
+train$MasVnrType = train$MasVnrType %>% str_replace_all("none", "nothing") 
+train$MasVnrArea = impute(train$MasVnrArea, 0)
+
+#train[train$MasVnrArea == 0, c("MasVnrType", "MasVnrArea")] %>% View()
+
+train$Electrical = impute(train$Electrical, "sbrkr")
+
+train[949, "BsmtExposure"] = "No"
+col_nothing = c("BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2","BsmtUnfSF","TotalBsmtSF")
+
+# impute_nothing = function(column){
+#   train[,column] = impute(train[,column], "nothing")
+# }
+# sapply(col_nothing, impute_nothing)
+
+for (column in col_nothing){
+  train[,column] = impute(train[,column], "nothing")
+}
+
+garage = c("GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "GarageCars","GarageArea")
+
+for (column in garage){
+  train[,column] = impute(train[,column], "nothing")
+}
+
+train$PoolQC = impute(train$PoolQC, 'nothing')
+
+train$FireplaceQu = impute(train$FireplaceQu, 'nothing')
+
+train$Fence = impute(train$Fence, 'nothing')
+
+train$MiscFeature = impute(train$MiscFeature, 'nothing')
+
+```
+```{r convert.ordinal}
+#c(Typ, Min1, Min2, Mod, Maj1, Maj2, Sev, Sal) %<-% seq(1,8)
+
+sapply(train$Functional, function(x) switch(x, Typ = 1, Min1 = 2, Min2 = 3, Mod = 4, Maj1 = 5, Maj2 = 6, Sev = 7, Sal = 8))
+
+train$LandSlope = sapply(train$LandSlope, function(x) switch(x, Gtl = 1, Mod = 2, Sev = 3))
+
+```
+
+```{r drop.columns}
+# Alley
+```
