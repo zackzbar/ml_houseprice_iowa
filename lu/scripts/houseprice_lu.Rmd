@@ -116,27 +116,6 @@ which(train == "none")
 which(train == "na")
 which(is.na(train))
 
-# convert year to categorical
-year_to_ordinal = function(year){
-  decade = -1
-  if (year < 1920) {
-    decade = 1
-  } else if (year > 1999){
-    decade = 10
-  }else{
-    decade = ((year %/% 10 * 10) - 1900) / 10
-  }
-  return(decade)
-}
-#sapply(train$YearBuilt, year_to_ordinal)
-train$YearBuilt = as.numeric(train$YearBuilt)
-train$YearRemodAdd = as.numeric(train$YearRemodAdd)
-train$GarageYrBlt = as.numeric(train$GarageYrBlt)
-
-train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
-train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
-train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
-
 write.csv(file = "./processed_data/train_full.csv", train)
 ```
 
@@ -173,9 +152,44 @@ train$GarageCond = switch_qual(train$GarageCond)
 train$PoolQC = switch_qual(train$PoolQC)
 train$FireplaceQu = switch_qual(train$FireplaceQu)
 
+# convert year to categorical
+year_to_ordinal = function(year){
+  decade = -1
+  if (year < 1920) {
+    decade = 1
+  } else if (year > 1999){
+    decade = 10
+  }else{
+    decade = ((year %/% 10 * 10) - 1900) / 10
+  }
+  return(decade)
+}
+#sapply(train$YearBuilt, year_to_ordinal)
+
+train$YearBuilt = as.numeric(train$YearBuilt)
+train$YearRemodAdd = as.numeric(train$YearRemodAdd)
+train$GarageYrBlt = as.numeric(train$GarageYrBlt)
+
+train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
+train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
+train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
+
 str(train)
 
 write_csv(train, "./processed_data/train_ordinal.csv")
+
+# year_to_ordinal = function(year){
+#   decade = -1
+#   if (year < 1920) {
+#     decade = 1
+#   } else if (year > 1999){
+#     decade = 10
+#   }else{
+#     decade = ((year %/% 10 * 10) - 1900) / 10
+#   }
+#   #return(decade)
+#   paste0('group_',as.character(decade))
+# }
 ```
 
 ```{r dummify}
