@@ -38,6 +38,9 @@ train[!is.na(train$Electrical), c("Electrical", "Utilities", "CentralAir", "Heat
 
 train[is.na(train$BsmtExposure) | is.na(train$BsmtFinType2),c("Id", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2","BsmtUnfSF","TotalBsmtSF")] %>% View() # id 949, BsmtExposure should be no, because it has all other basement features, NA here should not mean no basement, impute with "No", rest NA rows impute with Nothing; id 333, BsmtFinType2 is null, but has all other basement features, so here NA means no 2nd finish, but can still impute with Nothing
 
+garage_rows = train[is.na(train$GarageType),c("Id", "YearBuilt", "GarageType","GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "GarageCars", "GarageArea") ] %>% select(Id) %>% unlist() 
+train[train$Id %in% garage_rows, c("Id", "YearBuilt", "GarageType","GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "GarageCars", "GarageArea")] %>% View()
+
 train[is.na(train$PoolQC), c("PoolArea", "PoolQC")] %>% View()
 
 train[is.na(train$FireplaceQu), c("FireplaceQu", "Fireplaces")] %>% View()
@@ -46,14 +49,12 @@ train[is.na(train$Fence), "Fence"] %>% View()
 
 train[is.na(train$MiscFeature), c("MiscFeature", "MiscVal")] %>% View()
 ```
-```{r trim}
 
+```{r trim.and.impute}
 train = apply(train, 2, function(x) tolower(x))
 train = apply(train, 2, function(x) trimws(x))
-train = as.data.frame(train)
+train = as_tibble(train)
 
-```
-```{r impute.NA}
 train$LotFrontage = impute(train$LotFrontage, 0)
 train$Alley = impute(train$Alley, "nothing")
 
@@ -61,8 +62,22 @@ train$MasVnrType = impute(train$MasVnrType, "nothing")
 train$MasVnrType = train$MasVnrType %>% str_replace_all("none", "nothing") 
 train$MasVnrArea = impute(train$MasVnrArea, 0)
 
+train$GarageYrBlt[is.na(train$GarageYrBlt)] = train$YearBuilt[is.na(train$GarageYrBlt)]
+#train[is.na(train$GarageYrBlt), c("Id", "GarageYrBlt", "YearBuilt")]
+#fill = train[is.na(train$GarageYrBlt), c("YearBuilt")]
+#left_out = train[is.na(train$GarageYrBlt), c("Id")]
+#train[is.na(train$GarageYrBlt), "GarageYrBlt"] = fill
+#train[train$Id %in% left_out,c("Id", "GarageYrBlt", "YearBuilt")]
 #train[train$MasVnrArea == 0, c("MasVnrType", "MasVnrArea")] %>% View()
 
+# get_mode = function(x){
+#   lv = unique(x)
+#   ans = lv[which.max(tabulate(match(x, lv)))] %>% as.character()
+#   return(ans)
+# }
+
+# get_mode(train$Electrical)
+train$Electrical = impute(train$Electrical, "sbrkr")
 train$Electrical = impute(train$Electrical, "sbrkr")
 
 train[949, "BsmtExposure"] = "No"
@@ -91,16 +106,110 @@ train$Fence = impute(train$Fence, 'nothing')
 
 train$MiscFeature = impute(train$MiscFeature, 'nothing')
 
+
+## check NA
+#missing <- which(colSums(is.na(train)) > 0)
+#sort(colSums(sapply(train[missing], is.na)), decreasing=TRUE)
+#str_detect(train, "none") %>% sum()
+#str_detect(train, "na") %>% sum()
+which(train == "none")
+which(train == "na")
+which(is.na(train))
+
+write.csv(file = "./processed_data/train_full.csv", train)
 ```
+
+
+
 ```{r convert.ordinal}
 #c(Typ, Min1, Min2, Mod, Maj1, Maj2, Sev, Sal) %<-% seq(1,8)
+train = read_csv("./processed_data/train_full.csv")
+train = train[,-1] # get rid of auto-index
+col_class = sapply(train, class)
+str(train)
 
-sapply(train$Functional, function(x) switch(x, Typ = 1, Min1 = 2, Min2 = 3, Mod = 4, Maj1 = 5, Maj2 = 6, Sev = 7, Sal = 8))
+train$Functional = sapply(train$Functional, function(x) switch(x, typ = 8, min1 = 7, min2 = 6, mod = 5, maj1 = 4, maj2 = 3, sev = 2, sal = 1))
+train$LandSlope = sapply(train$LandSlope, function(x) switch(x, gtl = 3, mod = 2, sev = 1))
+train$GarageFinish = sapply(train$GarageFinish, function(x) switch(x, fin = 3, rfn = 2, unf = 1, nothing = 0))
+#train$Fence = sapply(train$Fence, function(x) switch(x, gdprv = 4, mnprv = 3, gdwo = 2, mnww = 1, nothing = 0))
 
-train$LandSlope = sapply(train$LandSlope, function(x) switch(x, Gtl = 1, Mod = 2, Sev = 3))
+switch_qual = function(x){
+  sapply(x, function(y) switch(y, ex = 5, gd = 4, ta = 3, fa = 2, po = 1, nothing = 0))
+}
+switch_type = function(x){
+  sapply(x, function(y) switch(y, glq = 6, alq = 5, blq = 4, rec = 3, lwq = 2, unf = 1, nothing = 0))
+}
 
+train$ExterQual = switch_qual(train$ExterQual)
+train$ExterCond = switch_qual(train$ExterCond)
+train$HeatingQC = switch_qual(train$HeatingQC)
+# nothing = 0 for BsmtQual?
+train$BsmtQual = switch_qual(train$BsmtQual)
+train$BsmtFinType1 = switch_type(train$BsmtFinType1)
+train$BsmtFinType2 = switch_type(train$BsmtFinType2)
+train$GarageQual = switch_qual(train$GarageQual)
+train$GarageCond = switch_qual(train$GarageCond)
+train$PoolQC = switch_qual(train$PoolQC)
+train$FireplaceQu = switch_qual(train$FireplaceQu)
+
+# convert year to categorical
+year_to_ordinal = function(year){
+  decade = -1
+  if (year < 1920) {
+    decade = 1
+  } else if (year > 1999){
+    decade = 10
+  }else{
+    decade = ((year %/% 10 * 10) - 1900) / 10
+  }
+  return(decade)
+}
+#sapply(train$YearBuilt, year_to_ordinal)
+
+train$YearBuilt = as.numeric(train$YearBuilt)
+train$YearRemodAdd = as.numeric(train$YearRemodAdd)
+train$GarageYrBlt = as.numeric(train$GarageYrBlt)
+
+train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
+train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
+train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
+
+str(train)
+
+write_csv(train, "./processed_data/train_ordinal.csv")
+
+# year_to_ordinal = function(year){
+#   decade = -1
+#   if (year < 1920) {
+#     decade = 1
+#   } else if (year > 1999){
+#     decade = 10
+#   }else{
+#     decade = ((year %/% 10 * 10) - 1900) / 10
+#   }
+#   #return(decade)
+#   paste0('group_',as.character(decade))
+# }
 ```
 
-```{r drop.columns}
-# Alley
+```{r dummify}
+library(rlang)
+train = read_csv("./processed_data/train_full.csv")
+train = train[,-1]
+
+# train %>% get_dummies.(LandSlope, drop_first = T, dummify_na = F)
+# train %>% get_dummies.(LandSlope, drop_first = T, dummify_na = F) %>% select(-LandSlope)
+# train %>% get_dummies.(LandSlope, drop_first = F, dummify_na = F) %>% select(-LandSlope)
+
+dummify = function(table, col){
+  dummy = get_dummies.(table[,col], drop_first = F, dummify_na = F) %>% select(-!!col)
+  # dummy = get_dummies.(table[,col], drop_first = T, dummify_na = F) %>% select(-!!col)
+  # table %>% get_dummies.(table[,col], drop_first = T, dummify_na = F) %>% select(-!!col)
+  cbind(select(train, -!!col), dummy) %>% as_tibble()
+}
+# class(train1), class(train2)
+train = dummify(train, "LandSlope")
+train = dummify(train, "GarageFinish")
+
+# carat- dummify function, allow pass in multiple columns, learnig colnames from training set
 ```
