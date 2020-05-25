@@ -128,11 +128,14 @@ year_to_ordinal = function(year){
   }
   return(decade)
 }
-sapply(train$YearBuilt, year_to_ordinal)
+#sapply(train$YearBuilt, year_to_ordinal)
+train$YearBuilt = as.numeric(train$YearBuilt)
+train$YearRemodAdd = as.numeric(train$YearRemodAdd)
+train$GarageYrBlt = as.numeric(train$GarageYrBlt)
 
-#train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
-#train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
-#train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
+train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
+train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
+train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
 
 write.csv(file = "./processed_data/train_full.csv", train)
 ```
