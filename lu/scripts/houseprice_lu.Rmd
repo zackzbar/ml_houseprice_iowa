@@ -78,9 +78,8 @@ train$GarageYrBlt[is.na(train$GarageYrBlt)] = train$YearBuilt[is.na(train$Garage
 
 # get_mode(train$Electrical)
 train$Electrical = impute(train$Electrical, "sbrkr")
-train$Electrical = impute(train$Electrical, "sbrkr")
 
-train[949, "BsmtExposure"] = "No"
+train[949, "BsmtExposure"] = "no"
 col_nothing = c("BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2","BsmtUnfSF","TotalBsmtSF")
 
 # impute_nothing = function(column){
@@ -139,12 +138,19 @@ switch_qual = function(x){
 switch_type = function(x){
   sapply(x, function(y) switch(y, glq = 6, alq = 5, blq = 4, rec = 3, lwq = 2, unf = 1, nothing = 0))
 }
+switch_exposure = function(x){
+  sapply(x, function(y) switch(y, gd = 4, av = 3, mn = 2, no = 1, nothing = 0))
+}
+
+# 1st time missed: BsmtExposure, KitchenQual, BsmtCond - convert to ordinal
 
 train$ExterQual = switch_qual(train$ExterQual)
 train$ExterCond = switch_qual(train$ExterCond)
 train$HeatingQC = switch_qual(train$HeatingQC)
-# nothing = 0 for BsmtQual?
+train$KitchenQual = switch_qual(train$KitchenQual) # missed first time
 train$BsmtQual = switch_qual(train$BsmtQual)
+train$BsmtCond = switch_qual(train$BsmtCond) # missed the 1st time
+train$BsmtExposure = switch_exposure(train$BsmtExposure) # missed the 1st time
 train$BsmtFinType1 = switch_type(train$BsmtFinType1)
 train$BsmtFinType2 = switch_type(train$BsmtFinType2)
 train$GarageQual = switch_qual(train$GarageQual)
@@ -212,4 +218,5 @@ train = dummify(train, "LandSlope")
 train = dummify(train, "GarageFinish")
 
 # carat- dummify function, allow pass in multiple columns, learnig colnames from training set
+# https://www.rdocumentation.org/packages/caret/versions/6.0-86/topics/dummyVars
 ```
