@@ -91,17 +91,19 @@ train$Fence = impute(train$Fence, 'nothing')
 
 train$MiscFeature = impute(train$MiscFeature, 'nothing')
 
-
-## check NA: should all be 0 after imputation
+# check NA: should all be 0 after imputation
 which(train == "none")
 which(train == "na")
 which(is.na(train))
 
+## write csv ####
+# transform SalePrice to log
+train['logSalePrice'] = log(train$SalePrice)
 write.csv(file = "../processed_data/train_full.csv", train, row.names = FALSE )
 ```
 
 
-```{r convert.ordinal}
+```{r convert.ordinal.log}
 ## this chuck is to convert ordinal categorical data to integer 
 
 # read in previously cleaned csv & check structure ####
@@ -164,7 +166,8 @@ train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
 train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
 train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
 
-# write csv train_ordinal: ordinal variables converted to integer form ####
 str(train)
+
+# write csv train_ordinal: ordinal variables converted to integer form ####
 write_csv(train, "../processed_data/train_ordinal.csv")
 ```
