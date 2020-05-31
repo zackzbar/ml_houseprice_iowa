@@ -49,6 +49,8 @@ train[is.na(train$MiscFeature), c("MiscFeature", "MiscVal")] %>% View()
 
 ```{r trim.and.impute}
 ## this chuck is to clean and impute data set
+# transform SalePrice to log
+train['logSalePrice'] = log(train$SalePrice)
 # clean data set: change all contents to lower case; trim white spaces ####
 train = apply(train, 2, function(x) tolower(x))
 train = apply(train, 2, function(x) trimws(x))
@@ -97,8 +99,6 @@ which(train == "na")
 which(is.na(train))
 
 ## write csv ####
-# transform SalePrice to log
-train['logSalePrice'] = log(train$SalePrice)
 write.csv(file = "../processed_data/train_full.csv", train, row.names = FALSE )
 ```
 
