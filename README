@@ -1,0 +1,16 @@
+This repo contain all files needed for the house price prediction machine learning project. 
+by Lu, Chase, Patrice, Zack
+NYC DSA bootcamp, June 2020
+
+1. scripts/
+Contains all scripts for data processing, visualzation, and modeling. 
+Please run the scripts in the following order: preprocess1, preprocess2, eda_plots, models
+
+2. raw_data/
+Contains orginal data files downloaded from Kaggle: https://www.kaggle.com/c/house-prices-advanced-regression-techniques/overview
+
+3. processed_data/
+Contains files processed and needed for modeling
+
+4. output/
+Contains csv and plot files as a result of data analysis and modeling

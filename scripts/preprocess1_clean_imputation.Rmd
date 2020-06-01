@@ -1,0 +1,173 @@
+---
+title: "houseprice_lu"
+output: html_document
+---
+```{r set.up.package}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Dropbox/nycdsa/projects/proj3_houseprice/scripts")
+# library for data wrangling & plotting
+library(tidyverse)
+# library for data imputing
+library(caret);library(Hmisc)
+```
+
+```{r load.data.set}
+# read in data set ####
+train = read_csv("../raw_data/train.csv")
+test = read_csv("../raw_data/test.csv")
+```
+
+```{r check.NA}
+# ignore this chuck when just running for pre-processing results
+# check what NA stands for and how to impute
+
+train[!is.na(train$LotFrontage), c("LotFrontage", "LotArea", "Street")] %>% .[order(.$LotFrontage),] %>% View() 
+train[is.na(train$LotFrontage), c("LotFrontage", "LotArea", "Street")] %>% .[order(.$LotFrontage),] %>% View() #So LotFrontage NA is due to LotArea 0, impute with 0
+train[is.na(train$LotFrontage), ] %>% nrow()
+
+train[is.na(train$Alley), "Alley" ] %>% View()
+
+train[is.na(train$Exterior2nd), c("Exterior1st", "Exterior2nd")] %>% View()
+
+train[is.na(train$MasVnrType), c('MasVnrType', 'MasVnrArea')] %>% View() # so MasVnrType NA & MasVnrArea NA are due to no masonry veneer, impute with "nothing" 
+
+train[!is.na(train$Electrical), c("Electrical", "Utilities", "CentralAir", "HeatingQC", "Heating")] %>% View()
+
+train[is.na(train$BsmtExposure) | is.na(train$BsmtFinType2),c("Id", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2","BsmtUnfSF","TotalBsmtSF")] %>% View() # id 949, BsmtExposure should be no, because it has all other basement features, NA here should not mean no basement, impute with "No", rest NA rows impute with Nothing; id 333, BsmtFinType2 is null, but has all other basement features, so here NA means no 2nd finish, but can still impute with Nothing
+
+garage_rows = train[is.na(train$GarageType),c("Id", "YearBuilt", "GarageType","GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "GarageCars", "GarageArea") ] %>% select(Id) %>% unlist() 
+train[train$Id %in% garage_rows, c("Id", "YearBuilt", "GarageType","GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "GarageCars", "GarageArea")] %>% View()
+
+train[is.na(train$PoolQC), c("PoolArea", "PoolQC")] %>% View()
+
+train[is.na(train$FireplaceQu), c("FireplaceQu", "Fireplaces")] %>% View()
+
+train[is.na(train$Fence), "Fence"] %>% View()
+
+train[is.na(train$MiscFeature), c("MiscFeature", "MiscVal")] %>% View()
+```
+
+```{r trim.and.impute}
+## this chuck is to clean and impute data set
+# transform SalePrice to log
+train['logSalePrice'] = log(train$SalePrice)
+# clean data set: change all contents to lower case; trim white spaces ####
+train = apply(train, 2, function(x) tolower(x))
+train = apply(train, 2, function(x) trimws(x))
+train = as_tibble(train)
+
+# imputation of NA values ####
+train$LotFrontage = impute(train$LotFrontage, 0)
+train$Alley = impute(train$Alley, "nothing")
+
+train$MasVnrType = impute(train$MasVnrType, "nothing")
+train$MasVnrType = train$MasVnrType %>% str_replace_all("none", "nothing") # replace none with nothing, to avoid reserve words for various coding languages
+train$MasVnrArea = impute(train$MasVnrArea, 0)
+
+train$GarageYrBlt[is.na(train$GarageYrBlt)] = train$YearBuilt[is.na(train$GarageYrBlt)]
+
+electrical_values = train %>% select(Electrical) %>% group_by(Electrical) %>% summarise(counts = n()) %>% arrange(desc(counts))
+electrical_mode = electrical_values[1,1] %>% as.character()
+
+train$Electrical = impute(train$Electrical, electrical_mode)
+
+train[949, "BsmtExposure"] = "no" # because other basement features were filled with this house, so basement exposure should be no rather than NA(no basement)
+
+col_nothing = c("BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2","BsmtUnfSF","TotalBsmtSF") # columns related to basement
+
+for (column in col_nothing){
+  train[,column] = impute(train[,column], "nothing")
+} # fill all basement related columns at once
+
+garage = c("GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "GarageCars","GarageArea") # columns related to garage
+
+for (column in garage){
+  train[,column] = impute(train[,column], "nothing")
+} # fill all garage related columns at once
+
+train$PoolQC = impute(train$PoolQC, 'nothing')
+
+train$FireplaceQu = impute(train$FireplaceQu, 'nothing')
+
+train$Fence = impute(train$Fence, 'nothing')
+
+train$MiscFeature = impute(train$MiscFeature, 'nothing')
+
+# check NA: should all be 0 after imputation
+which(train == "none")
+which(train == "na")
+which(is.na(train))
+
+## write csv ####
+write.csv(file = "../processed_data/train_full.csv", train, row.names = FALSE )
+```
+
+
+```{r convert.ordinal.log}
+## this chuck is to convert ordinal categorical data to integer 
+
+# read in previously cleaned csv & check structure ####
+train = read_csv("../processed_data/train_full.csv")
+col_class = sapply(train, class)
+str(train)
+
+# assign integer to ordinal categorical variables ####
+train$Functional = sapply(train$Functional, function(x) switch(x, typ = 8, min1 = 7, min2 = 6, mod = 5, maj1 = 4, maj2 = 3, sev = 2, sal = 1))
+train$LandSlope = sapply(train$LandSlope, function(x) switch(x, gtl = 3, mod = 2, sev = 1))
+train$GarageFinish = sapply(train$GarageFinish, function(x) switch(x, fin = 3, rfn = 2, unf = 1, nothing = 0))
+
+# functions to convert character to integer ####
+switch_qual = function(x){
+  sapply(x, function(y) switch(y, ex = 5, gd = 4, ta = 3, fa = 2, po = 1, nothing = 0))
+}
+switch_type = function(x){
+  sapply(x, function(y) switch(y, glq = 6, alq = 5, blq = 4, rec = 3, lwq = 2, unf = 1, nothing = 0))
+}
+switch_exposure = function(x){
+  sapply(x, function(y) switch(y, gd = 4, av = 3, mn = 2, no = 1, nothing = 0))
+}
+
+# convert charcter to integer for ordinal variables in data set in order ####
+train$ExterQual = switch_qual(train$ExterQual)
+train$ExterCond = switch_qual(train$ExterCond)
+train$HeatingQC = switch_qual(train$HeatingQC)
+train$KitchenQual = switch_qual(train$KitchenQual) 
+train$BsmtQual = switch_qual(train$BsmtQual)
+train$BsmtCond = switch_qual(train$BsmtCond) 
+train$BsmtExposure = switch_exposure(train$BsmtExposure) 
+train$BsmtFinType1 = switch_type(train$BsmtFinType1)
+train$BsmtFinType2 = switch_type(train$BsmtFinType2)
+train$GarageQual = switch_qual(train$GarageQual)
+train$GarageCond = switch_qual(train$GarageCond)
+train$PoolQC = switch_qual(train$PoolQC)
+train$FireplaceQu = switch_qual(train$FireplaceQu)
+
+
+# function to convert year variables to categorical ####
+# because sale price by year is not ordinal through the full span, group years before 1920 to a single group, after that group by decase
+year_to_ordinal = function(year){
+  decade = -1
+  if (year < 1920) {
+    decade = 1
+  } else if (year > 1999){
+    decade = 10
+  }else{
+    decade = ((year %/% 10 * 10) - 1900) / 10
+  }
+  return(decade)
+}
+
+# convert year variables to categorical ####
+train$YearBuilt = as.numeric(train$YearBuilt)
+train$YearRemodAdd = as.numeric(train$YearRemodAdd)
+train$GarageYrBlt = as.numeric(train$GarageYrBlt)
+
+train$decade_YearBuilt = sapply(train$YearBuilt, year_to_ordinal)
+train$decade_YearRemodAdd = sapply(train$YearRemodAdd, year_to_ordinal)
+train$decade_GarageYrBlt = sapply(train$GarageYrBlt, year_to_ordinal)
+
+str(train)
+
+# write csv train_ordinal: ordinal variables converted to integer form ####
+write_csv(train, "../processed_data/train_ordinal.csv")
+```
